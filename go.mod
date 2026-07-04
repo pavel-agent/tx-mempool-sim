@@ -1,4 +1,4 @@
-module github.com/pkiselyov/tx-mempool-simulator
+module github.com/pavel-ai-agent/tx-mempool-simulator
 
 go 1.21
 

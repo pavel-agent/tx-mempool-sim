@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/pkiselyov/tx-mempool-simulator/mempool"
+	"github.com/pavel-ai-agent/tx-mempool-simulator/mempool"
 )
 
 func main() {
