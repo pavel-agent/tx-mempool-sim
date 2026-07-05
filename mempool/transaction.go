@@ -4,7 +4,6 @@ package mempool
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -40,10 +39,4 @@ func (tx *Transaction) computeHash() string {
 	h := sha3.New256()
 	h.Write([]byte(data))
 	return "0x" + hex.EncodeToString(h.Sum(nil))
-}
-
-// MarshalJSON implements custom JSON marshalling.
-func (tx *Transaction) MarshalJSON() ([]byte, error) {
-	type Alias Transaction
-	return json.Marshal(&struct{ *Alias }{Alias: (*Alias)(tx)})
 }
