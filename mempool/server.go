@@ -42,6 +42,16 @@ type GetPendingByAddressParams struct {
 	Address string `json:"address"`
 }
 
+// GetTransactionByHashParams holds the parameters for getTransactionByHash.
+type GetTransactionByHashParams struct {
+	Hash string `json:"hash"`
+}
+
+// DropTransactionParams holds the parameters for dropTransaction.
+type DropTransactionParams struct {
+	Hash string `json:"hash"`
+}
+
 // Server is the JSON-RPC HTTP server for the mempool.
 type Server struct {
 	pool *Pool
@@ -96,6 +106,10 @@ func (s *Server) handleRPC(w http.ResponseWriter, r *http.Request) {
 		s.handleGetPoolStatus(w, &req)
 	case "getPendingByAddress":
 		s.handleGetPendingByAddress(w, &req)
+	case "getTransactionByHash":
+		s.handleGetTransactionByHash(w, &req)
+	case "dropTransaction":
+		s.handleDropTransaction(w, &req)
 	default:
 		writeError(w, req.ID, -32601, fmt.Sprintf("method not found: %s", req.Method))
 	}
@@ -150,6 +164,46 @@ func (s *Server) handleGetPendingByAddress(w http.ResponseWriter, req *JSONRPCRe
 		txs = []*Transaction{}
 	}
 	writeResult(w, req.ID, txs)
+}
+
+func (s *Server) handleGetTransactionByHash(w http.ResponseWriter, req *JSONRPCRequest) {
+	var params GetTransactionByHashParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		writeError(w, req.ID, -32602, "invalid params: "+err.Error())
+		return
+	}
+	if params.Hash == "" {
+		writeError(w, req.ID, -32602, "invalid params: hash is required")
+		return
+	}
+
+	tx := s.pool.Get(params.Hash)
+	if tx == nil {
+		writeError(w, req.ID, -32001, fmt.Sprintf("transaction %s not found", params.Hash))
+		return
+	}
+	writeResult(w, req.ID, tx)
+}
+
+func (s *Server) handleDropTransaction(w http.ResponseWriter, req *JSONRPCRequest) {
+	var params DropTransactionParams
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		writeError(w, req.ID, -32602, "invalid params: "+err.Error())
+		return
+	}
+	if params.Hash == "" {
+		writeError(w, req.ID, -32602, "invalid params: hash is required")
+		return
+	}
+
+	if !s.pool.Remove(params.Hash) {
+		writeError(w, req.ID, -32001, fmt.Sprintf("transaction %s not found", params.Hash))
+		return
+	}
+	writeResult(w, req.ID, map[string]interface{}{
+		"hash":    params.Hash,
+		"message": "transaction dropped",
+	})
 }
 
 func writeResult(w http.ResponseWriter, id interface{}, result interface{}) {

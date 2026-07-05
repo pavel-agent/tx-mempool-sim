@@ -460,3 +460,38 @@ func TestAddMultipleSenders(t *testing.T) {
 		t.Errorf("expected 3 senders, got %d", status.SenderCount)
 	}
 }
+
+func TestPoolGetAndRemove(t *testing.T) {
+	pool := NewPool(Config{MaxSize: 100})
+	tx := NewTransaction("0xAlice", 0, 50, 200)
+	if err := pool.Add(tx); err != nil {
+		t.Fatalf("add failed: %v", err)
+	}
+
+	// Hit.
+	if got := pool.Get(tx.Hash); got == nil || got.Hash != tx.Hash {
+		t.Fatalf("Get should return the tx, got %v", got)
+	}
+	// Miss.
+	if got := pool.Get("0xdoesnotexist"); got != nil {
+		t.Errorf("Get on missing hash should return nil, got %v", got)
+	}
+
+	// Remove hit.
+	if !pool.Remove(tx.Hash) {
+		t.Error("Remove should return true for present tx")
+	}
+	if pool.Get(tx.Hash) != nil {
+		t.Error("tx should be gone from byHash after Remove")
+	}
+	if pool.Status().Size != 0 {
+		t.Error("pool size should be 0 after Remove")
+	}
+	if len(pool.PendingByAddress("0xAlice")) != 0 {
+		t.Error("sender index should be empty after Remove")
+	}
+	// Remove miss.
+	if pool.Remove(tx.Hash) {
+		t.Error("Remove should return false for absent tx")
+	}
+}

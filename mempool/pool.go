@@ -118,6 +118,30 @@ func (p *Pool) removeSenderTx(tx *Transaction) {
 	}
 }
 
+// Get returns the transaction with the given hash, or nil if it is not in the pool.
+func (p *Pool) Get(hash string) *Transaction {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.byHash[hash]
+}
+
+// Remove drops the transaction with the given hash from the pool, removing it
+// from the priority queue, the byHash index, and the per-sender index. It
+// returns true if a transaction was removed, false if it was not present.
+func (p *Pool) Remove(hash string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	tx, exists := p.byHash[hash]
+	if !exists {
+		return false
+	}
+	p.pq.RemoveByHash(hash)
+	delete(p.byHash, hash)
+	p.removeSenderTx(tx)
+	return true
+}
+
 // PendingByAddress returns all pending transactions for a given sender, sorted by nonce.
 func (p *Pool) PendingByAddress(sender string) []*Transaction {
 	p.mu.RLock()

@@ -60,6 +60,34 @@ curl -X POST http://localhost:8545 -H 'Content-Type: application/json' -d '{
 }'
 ```
 
+### getTransactionByHash
+
+Look up a single transaction by its hash. Returns the transaction, or a
+not-found error if it is not in the pool.
+
+```bash
+curl -X POST http://localhost:8545 -H 'Content-Type: application/json' -d '{
+  "jsonrpc": "2.0",
+  "method": "getTransactionByHash",
+  "params": {"hash": "0x..."},
+  "id": 4
+}'
+```
+
+### dropTransaction
+
+Remove a transaction (e.g. one that has been mined or cancelled) from the pool
+by its hash. Returns a not-found error if it is not present.
+
+```bash
+curl -X POST http://localhost:8545 -H 'Content-Type: application/json' -d '{
+  "jsonrpc": "2.0",
+  "method": "dropTransaction",
+  "params": {"hash": "0x..."},
+  "id": 5
+}'
+```
+
 ## Testing
 
 ```bash

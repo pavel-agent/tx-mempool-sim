@@ -415,3 +415,50 @@ func TestPoolStatusViaRPCFields(t *testing.T) {
 		t.Errorf("expected floorGasPrice 50, got %v", result["floorGasPrice"])
 	}
 }
+
+func TestGetTransactionByHashRPC(t *testing.T) {
+	pool := NewPool(Config{MaxSize: 100})
+	srv := NewServer(pool)
+
+	sendResp := rpcCall(t, srv.Handler(), "sendTransaction", SendTransactionParams{
+		Sender: "0xAlice", Nonce: 0, GasPrice: 50, Size: 200,
+	})
+	hash := sendResp.Result.(map[string]interface{})["hash"].(string)
+
+	// Hit.
+	resp := rpcCall(t, srv.Handler(), "getTransactionByHash", GetTransactionByHashParams{Hash: hash})
+	if resp.Error != nil {
+		t.Fatalf("expected tx, got error %v", resp.Error)
+	}
+
+	// Miss.
+	miss := rpcCall(t, srv.Handler(), "getTransactionByHash", GetTransactionByHashParams{Hash: "0xnope"})
+	if miss.Error == nil {
+		t.Error("expected not-found error for missing hash")
+	}
+}
+
+func TestDropTransactionRPC(t *testing.T) {
+	pool := NewPool(Config{MaxSize: 100})
+	srv := NewServer(pool)
+
+	sendResp := rpcCall(t, srv.Handler(), "sendTransaction", SendTransactionParams{
+		Sender: "0xAlice", Nonce: 0, GasPrice: 50, Size: 200,
+	})
+	hash := sendResp.Result.(map[string]interface{})["hash"].(string)
+
+	// Drop hit.
+	resp := rpcCall(t, srv.Handler(), "dropTransaction", DropTransactionParams{Hash: hash})
+	if resp.Error != nil {
+		t.Fatalf("expected drop success, got error %v", resp.Error)
+	}
+	if pool.Status().Size != 0 {
+		t.Error("pool should be empty after drop")
+	}
+
+	// Drop miss.
+	miss := rpcCall(t, srv.Handler(), "dropTransaction", DropTransactionParams{Hash: hash})
+	if miss.Error == nil {
+		t.Error("expected not-found error dropping absent tx")
+	}
+}
