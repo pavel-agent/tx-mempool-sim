@@ -133,14 +133,28 @@ func (p *Pool) PendingByAddress(sender string) []*Transaction {
 }
 
 // DetectNonceGaps scans all senders and reports any gaps in nonce sequences.
+// Senders are expected to begin at nonce 0, so a sender whose lowest present
+// nonce is above 0 reports a leading gap from 0 (this also covers a lone
+// high-nonce tx from a fresh account). Gaps between consecutive present
+// transactions are reported as well.
 func (p *Pool) DetectNonceGaps() []NonceGap {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
 	var gaps []NonceGap
 	for sender, txs := range p.bySender {
-		if len(txs) < 2 {
+		if len(txs) == 0 {
 			continue
+		}
+		// Senders are expected to start at nonce 0. If the lowest present
+		// nonce is above 0, the account is missing its leading transactions
+		// (the canonical stuck/gapped case, including single-tx senders).
+		if txs[0].Nonce > 0 {
+			gaps = append(gaps, NonceGap{
+				Sender:   sender,
+				Expected: 0,
+				Found:    txs[0].Nonce,
+			})
 		}
 		for i := 1; i < len(txs); i++ {
 			expected := txs[i-1].Nonce + 1
@@ -187,8 +201,17 @@ func (p *Pool) Status() PoolStatus {
 	// Release read lock temporarily to avoid calling DetectNonceGaps which also locks.
 	var gaps []NonceGap
 	for sender, txs := range p.bySender {
-		if len(txs) < 2 {
+		if len(txs) == 0 {
 			continue
+		}
+		// Report a leading gap when the account's lowest present nonce is
+		// above the expected starting nonce (0), covering single-tx senders.
+		if txs[0].Nonce > 0 {
+			gaps = append(gaps, NonceGap{
+				Sender:   sender,
+				Expected: 0,
+				Found:    txs[0].Nonce,
+			})
 		}
 		for i := 1; i < len(txs); i++ {
 			expected := txs[i-1].Nonce + 1

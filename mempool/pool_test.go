@@ -285,10 +285,25 @@ func TestNonceGapDetectionSingleTx(t *testing.T) {
 	tx := NewTransaction("0xAlice", 5, 50, 100)
 	pool.Add(tx)
 
-	// Single tx per sender should never report gaps.
+	// A lone high-nonce tx from a fresh account (expected to start at 0) is
+	// the canonical stuck/gapped case and must be reported as a leading gap
+	// from nonce 0 to 5.
 	gaps := pool.DetectNonceGaps()
-	if len(gaps) != 0 {
-		t.Errorf("expected no gaps for single tx, got %d", len(gaps))
+	if len(gaps) != 1 {
+		t.Fatalf("expected 1 leading gap for single high-nonce tx, got %d", len(gaps))
+	}
+	if gaps[0].Expected != 0 || gaps[0].Found != 5 {
+		t.Errorf("expected leading gap (0,5), got (%d,%d)", gaps[0].Expected, gaps[0].Found)
+	}
+}
+
+func TestNonceGapDetectionSingleTxAtZero(t *testing.T) {
+	pool := NewPool(Config{MaxSize: 100})
+	pool.Add(NewTransaction("0xAlice", 0, 50, 100))
+
+	// A single tx starting at nonce 0 has no gap.
+	if gaps := pool.DetectNonceGaps(); len(gaps) != 0 {
+		t.Errorf("expected no gaps for single tx at nonce 0, got %d", len(gaps))
 	}
 }
 
