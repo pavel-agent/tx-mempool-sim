@@ -39,12 +39,19 @@ func TestNewTransactionHashFormat(t *testing.T) {
 }
 
 func TestNewTransactionHashDeterministic(t *testing.T) {
-	// Two transactions with the same fields and same timestamp should have the same hash.
 	tx := NewTransaction("0xAlice", 0, 50, 200)
 	// Manually recompute to verify determinism.
 	recomputed := tx.computeHash()
 	if tx.Hash != recomputed {
 		t.Errorf("hash is not deterministic: %s vs %s", tx.Hash, recomputed)
+	}
+
+	// Two independent transactions with identical canonical fields must share
+	// the same hash even though their timestamps differ, so that resubmitted
+	// duplicates are caught by the byHash index.
+	tx2 := NewTransaction("0xAlice", 0, 50, 200)
+	if tx.Hash != tx2.Hash {
+		t.Errorf("identical transactions should hash equally: %s vs %s", tx.Hash, tx2.Hash)
 	}
 }
 

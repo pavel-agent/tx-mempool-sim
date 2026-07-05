@@ -34,9 +34,12 @@ func NewTransaction(sender string, nonce, gasPrice, size uint64) *Transaction {
 	return tx
 }
 
-// computeHash derives a deterministic hash from the transaction fields using SHA3-256.
+// computeHash derives a deterministic hash from the canonical transaction
+// fields using SHA3-256. Timestamp is intentionally excluded so that two
+// logically identical transactions (same sender/nonce/gasPrice/size) hash to
+// the same value, enabling duplicate detection via the byHash index.
 func (tx *Transaction) computeHash() string {
-	data := fmt.Sprintf("%s:%d:%d:%d:%d", tx.Sender, tx.Nonce, tx.GasPrice, tx.Size, tx.Timestamp)
+	data := fmt.Sprintf("%s:%d:%d:%d", tx.Sender, tx.Nonce, tx.GasPrice, tx.Size)
 	h := sha3.New256()
 	h.Write([]byte(data))
 	return "0x" + hex.EncodeToString(h.Sum(nil))
