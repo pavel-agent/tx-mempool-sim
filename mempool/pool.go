@@ -136,7 +136,13 @@ func (p *Pool) PendingByAddress(sender string) []*Transaction {
 func (p *Pool) DetectNonceGaps() []NonceGap {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
+	return p.detectNonceGapsLocked()
+}
 
+// detectNonceGapsLocked scans all senders for nonce-sequence gaps. The caller
+// must already hold p.mu (read or write). It is shared by DetectNonceGaps and
+// Status so the gap-detection logic lives in exactly one place.
+func (p *Pool) detectNonceGapsLocked() []NonceGap {
 	var gaps []NonceGap
 	for sender, txs := range p.bySender {
 		if len(txs) < 2 {
@@ -183,25 +189,10 @@ func (p *Pool) Status() PoolStatus {
 		status.FloorGasPrice = minPrice
 	}
 
-	// Include nonce gaps in status.
-	// Release read lock temporarily to avoid calling DetectNonceGaps which also locks.
-	var gaps []NonceGap
-	for sender, txs := range p.bySender {
-		if len(txs) < 2 {
-			continue
-		}
-		for i := 1; i < len(txs); i++ {
-			expected := txs[i-1].Nonce + 1
-			if txs[i].Nonce != expected {
-				gaps = append(gaps, NonceGap{
-					Sender:   sender,
-					Expected: expected,
-					Found:    txs[i].Nonce,
-				})
-			}
-		}
-	}
-	status.NonceGaps = gaps
+	// Include nonce gaps in status. We already hold the read lock, so reuse
+	// the shared locked helper rather than DetectNonceGaps (which would try to
+	// re-acquire the lock) or an inline copy of the loop.
+	status.NonceGaps = p.detectNonceGapsLocked()
 
 	return status
 }
