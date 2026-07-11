@@ -73,31 +73,71 @@ func (s *Server) handleRPC(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		writeError(w, nil, -32700, "parse error")
+		writeJSON(w, errorResponse(nil, -32700, "parse error"))
 		return
 	}
 	defer r.Body.Close()
 
-	var req JSONRPCRequest
-	if err := json.Unmarshal(body, &req); err != nil {
-		writeError(w, nil, -32700, "parse error")
+	// Detect a JSON-RPC 2.0 batch: a top-level JSON array of request objects.
+	if isBatch(body) {
+		var reqs []JSONRPCRequest
+		if err := json.Unmarshal(body, &reqs); err != nil {
+			writeJSON(w, errorResponse(nil, -32700, "parse error"))
+			return
+		}
+		if len(reqs) == 0 {
+			// An empty batch is itself an invalid request per the spec.
+			writeJSON(w, errorResponse(nil, -32600, "invalid request: empty batch"))
+			return
+		}
+		responses := make([]JSONRPCResponse, 0, len(reqs))
+		for i := range reqs {
+			responses = append(responses, s.dispatch(&reqs[i]))
+		}
+		writeJSON(w, responses)
 		return
 	}
 
-	if req.JSONRPC != "2.0" {
-		writeError(w, req.ID, -32600, "invalid request: jsonrpc must be 2.0")
+	var req JSONRPCRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		writeJSON(w, errorResponse(nil, -32700, "parse error"))
 		return
+	}
+	writeJSON(w, s.dispatch(&req))
+}
+
+// isBatch reports whether the body's first non-whitespace byte is '[',
+// indicating a JSON-RPC batch (array of requests).
+func isBatch(body []byte) bool {
+	for _, b := range body {
+		switch b {
+		case ' ', '\t', '\n', '\r':
+			continue
+		case '[':
+			return true
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+// dispatch validates and routes a single JSON-RPC request, returning the
+// response object rather than writing it, so it can be reused for batches.
+func (s *Server) dispatch(req *JSONRPCRequest) JSONRPCResponse {
+	if req.JSONRPC != "2.0" {
+		return errorResponse(req.ID, -32600, "invalid request: jsonrpc must be 2.0")
 	}
 
 	switch req.Method {
 	case "sendTransaction":
-		s.handleSendTransaction(w, &req)
+		return s.handleSendTransaction(req)
 	case "getPoolStatus":
-		s.handleGetPoolStatus(w, &req)
+		return s.handleGetPoolStatus(req)
 	case "getPendingByAddress":
-		s.handleGetPendingByAddress(w, &req)
+		return s.handleGetPendingByAddress(req)
 	default:
-		writeError(w, req.ID, -32601, fmt.Sprintf("method not found: %s", req.Method))
+		return errorResponse(req.ID, -32601, fmt.Sprintf("method not found: %s", req.Method))
 	}
 }
 
