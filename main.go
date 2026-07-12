@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/pavel-ai-agent/tx-mempool-simulator/mempool"
+	"github.com/ai-pavel/purgatoryulator/mempool"
 )
 
 func main() {

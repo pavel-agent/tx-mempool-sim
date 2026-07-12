@@ -1,4 +1,4 @@
-module github.com/pavel-ai-agent/tx-mempool-simulator
+module github.com/ai-pavel/purgatoryulator
 
 go 1.21
 
